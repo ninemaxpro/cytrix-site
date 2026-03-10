@@ -13,6 +13,7 @@
     "@types/node": "^25.4.0",
     "@types/react": "^19.2.14",
     "@vercel/analytics": "^2.0.0",
+    "@vercel/speed-insights": "^2.0.0",
     "@xyflow/react": "^12.10.1",
     "framer-motion": "^12.35.2",
     "next": "^16.1.6",
