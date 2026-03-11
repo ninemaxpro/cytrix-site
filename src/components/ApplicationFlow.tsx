@@ -117,11 +117,8 @@ const EDGES: GEdge[] = [
   { id: "tfp-tfap",   from: "tfplan",       to: "tfapply",      tags: ["cicd"]   },
   // TF Apply enters AWS zone
   { id: "tfap-eb",    from: "tfapply",      to: "eventbridge",  tags: ["cicd", "cytrix"] },
-  // Lambda chain
+  // EventBridge → Collector
   { id: "eb-col",     from: "eventbridge",  to: "collector",    tags: ["cytrix"] },
-  { id: "col-enr",    from: "collector",    to: "enricher",     tags: ["cytrix"] },
-  { id: "enr-scr",    from: "enricher",     to: "scorer",       tags: ["cytrix"] },
-  { id: "scr-cor",    from: "scorer",       to: "correlator",   tags: ["cytrix"] },
   // Lambda → S3 (vertical down)
   { id: "col-s3r",    from: "collector",    to: "s3raw",        tags: ["cytrix"] },
   { id: "enr-s3e",    from: "enricher",     to: "s3enriched",   tags: ["cytrix"] },
