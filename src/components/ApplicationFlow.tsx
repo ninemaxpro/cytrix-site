@@ -15,7 +15,6 @@ const FILTERS = [
 
 type FilterId = typeof FILTERS[number]["id"];
 
-// ─── Node definitions ──────────────────────────────────────────────────────
 interface PipelineNode {
   id: string;
   label: string;
@@ -24,62 +23,82 @@ interface PipelineNode {
   icon: React.ReactNode;
 }
 
-const NODES: Record<string, PipelineNode> = {
-  dev: {
-    id: "dev", label: "Dev", sublabel: "Local machine",
-    tags: ["shift-left"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>,
+// ─── Swimlane definitions ──────────────────────────────────────────────────
+interface SwimLane {
+  id: string;
+  label: string;
+  headerIcon: React.ReactNode;
+  nodes: PipelineNode[];
+}
+
+const LANES: SwimLane[] = [
+  {
+    id: "dev",
+    label: "Dev Laptop",
+    headerIcon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" /></svg>,
+    nodes: [
+      {
+        id: "dev", label: "Dev", sublabel: "pre-commit",
+        tags: ["shift-left"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" /></svg>,
+      },
+      {
+        id: "terraform", label: "Terraform", sublabel: "IaC modules",
+        tags: ["terraform", "zero-trust", "shift-left"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3" /></svg>,
+      },
+    ],
   },
-  terraform: {
-    id: "terraform", label: "Terraform", sublabel: "IaC modules",
-    tags: ["terraform", "zero-trust", "shift-left"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3" /></svg>,
+  {
+    id: "github",
+    label: "GitHub",
+    headerIcon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" /></svg>,
+    nodes: [
+      {
+        id: "github-actions", label: "GH Actions", sublabel: "CI pipeline",
+        tags: ["shift-left", "vuln-mgmt", "logging", "future"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>,
+      },
+      {
+        id: "plan-apply", label: "Plan / Apply", sublabel: "validated apply",
+        tags: ["terraform", "zero-trust", "logging"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+      },
+    ],
   },
-  "github-actions": {
-    id: "github-actions", label: "GitHub Actions", sublabel: "CI pipeline",
-    tags: ["shift-left", "vuln-mgmt", "logging", "future"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>,
+  {
+    id: "aws",
+    label: "AWS",
+    headerIcon: <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" /></svg>,
+    nodes: [
+      {
+        id: "lambda", label: "Lambda", sublabel: "scoped IAM",
+        tags: ["zero-trust", "terraform"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>,
+      },
+      {
+        id: "s3", label: "S3", sublabel: "encrypted data",
+        tags: ["terraform", "zero-trust"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>,
+      },
+      {
+        id: "cloudtrail", label: "CloudTrail", sublabel: "API audit",
+        tags: ["logging"],
+        icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V19.5a2.25 2.25 0 002.25 2.25h.75" /></svg>,
+      },
+    ],
   },
-  "plan-apply": {
-    id: "plan-apply", label: "Plan / Apply", sublabel: "IaC validation",
-    tags: ["terraform", "zero-trust", "logging"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-  },
-  ecr: {
-    id: "ecr", label: "ECR", sublabel: "Image registry",
-    tags: ["shift-left", "vuln-mgmt", "zero-trust"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>,
-  },
-  ecs: {
-    id: "ecs", label: "ECS / VPC", sublabel: "Runtime infra",
-    tags: ["zero-trust", "terraform", "logging"],
-    icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" /></svg>,
-  },
+];
+
+// ─── Color palette ─────────────────────────────────────────────────────────
+const colorMap = {
+  cyan:    { btn: "border-cyan-500/40 text-cyan-400 bg-cyan-500/10",         active: "border-cyan-400 bg-cyan-500/20 text-cyan-300",         node: "border-cyan-400 bg-cyan-500/10 shadow-cyan-500/30",         ring: "bg-cyan-400",    dot: "bg-cyan-400",    line: "bg-cyan-400",    badge: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",       heading: "text-cyan-300",    card: "border-cyan-500/30 shadow-cyan-500/10"    },
+  emerald: { btn: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10", active: "border-emerald-400 bg-emerald-500/20 text-emerald-300", node: "border-emerald-400 bg-emerald-500/10 shadow-emerald-500/30", ring: "bg-emerald-400", dot: "bg-emerald-400", line: "bg-emerald-400", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", heading: "text-emerald-300", card: "border-emerald-500/30 shadow-emerald-500/10" },
+  violet:  { btn: "border-violet-500/40 text-violet-400 bg-violet-500/10",   active: "border-violet-400 bg-violet-500/20 text-violet-300",   node: "border-violet-400 bg-violet-500/10 shadow-violet-500/30",   ring: "bg-violet-400",  dot: "bg-violet-400",  line: "bg-violet-400",  badge: "bg-violet-500/15 text-violet-300 border-violet-500/30",  heading: "text-violet-300",  card: "border-violet-500/30 shadow-violet-500/10"  },
+  amber:   { btn: "border-amber-500/40 text-amber-400 bg-amber-500/10",       active: "border-amber-400 bg-amber-500/20 text-amber-300",       node: "border-amber-400 bg-amber-500/10 shadow-amber-500/30",       ring: "bg-amber-400",   dot: "bg-amber-400",   line: "bg-amber-400",   badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",     heading: "text-amber-300",   card: "border-amber-500/30 shadow-amber-500/10"   },
+  rose:    { btn: "border-rose-500/40 text-rose-400 bg-rose-500/10",          active: "border-rose-400 bg-rose-500/20 text-rose-300",          node: "border-rose-400 bg-rose-500/10 shadow-rose-500/30",          ring: "bg-rose-400",    dot: "bg-rose-400",    line: "bg-rose-400",    badge: "bg-rose-500/15 text-rose-300 border-rose-500/30",        heading: "text-rose-300",    card: "border-rose-500/30 shadow-rose-500/10"    },
+  indigo:  { btn: "border-indigo-500/40 text-indigo-400 bg-indigo-500/10",    active: "border-indigo-400 bg-indigo-500/20 text-indigo-300",    node: "border-indigo-400 bg-indigo-500/10 shadow-indigo-500/30",    ring: "bg-indigo-400",  dot: "bg-indigo-400",  line: "bg-indigo-400",  badge: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",  heading: "text-indigo-300",  card: "border-indigo-500/30 shadow-indigo-500/10"  },
 };
-
-// ─── Pipeline rows: [devLaptop node, GitHub node, AWS node] + gates ────────
-const ROWS: {
-  nodeIds: [string, string, string];
-  gates: [string, string];
-  rowTags: FilterId[];
-}[] = [
-  {
-    nodeIds: ["dev", "github-actions", "ecr"],
-    gates: ["git-secrets", "Trivy CI"],
-    rowTags: ["shift-left", "vuln-mgmt", "zero-trust", "logging", "future"],
-  },
-  {
-    nodeIds: ["terraform", "plan-apply", "ecs"],
-    gates: ["tfsec", "IAM Scope"],
-    rowTags: ["terraform", "zero-trust", "shift-left", "logging"],
-  },
-];
-
-const SWIMLANES = [
-  { label: "Dev Laptop", col: 1 },
-  { label: "GitHub",     col: 3 },
-  { label: "AWS",        col: 5 },
-];
 
 // ─── Detail panel content ──────────────────────────────────────────────────
 interface FilterPoint { node: string; badge: string; detail: string; planned?: boolean; }
@@ -89,93 +108,82 @@ const filterDetails: Record<FilterId, FilterDetail> = {
   "shift-left": {
     title: "Shift Left Security",
     points: [
-      { node: "Dev",            badge: "git-secrets",    detail: "Pre-commit hooks scan every commit for secrets and credentials before they reach the repo. Block at source, not after the fact." },
-      { node: "GitHub Actions", badge: "tfsec",          detail: "tfsec scans all Terraform on every PR. HIGH/CRITICAL findings block the merge — policy failures never reach plan." },
-      { node: "GitHub Actions", badge: "Trivy CI",       detail: "Trivy scans the Docker image after build. CRITICAL CVEs block the push to ECR — vulnerable images never land in the registry." },
-      { node: "Terraform",      badge: "Policy-as-Code", detail: "tfsec integrated as a required CI step — no terraform plan runs unless IaC scan passes clean. Security is a merge prerequisite." },
+      { node: "Dev",        badge: "git-secrets",    detail: "Pre-commit hook scans every commit for secrets and credentials before they reach the repo. Block at source — not after the fact." },
+      { node: "GH Actions", badge: "tfsec",          detail: "tfsec scans all Terraform on every PR. HIGH/CRITICAL findings block the merge — policy failures never reach plan." },
+      { node: "GH Actions", badge: "Bandit",         detail: "Bandit runs static analysis on all Python Lambda code. Common issues — hardcoded secrets, insecure function calls — are caught before merge." },
+      { node: "Terraform",  badge: "Policy-as-Code", detail: "tfsec is a required CI step. No terraform plan runs unless the IaC scan passes clean. Security is a merge prerequisite, not an afterthought." },
     ],
   },
   "terraform": {
     title: "Terraform Guardrails",
     points: [
-      { node: "Terraform",    badge: "Hardened Modules",  detail: "Modules enforce encryption-at-rest, deny public S3 ACLs, and scope IAM roles to least privilege by default. Security is the module default, not an option." },
-      { node: "Plan / Apply", badge: "Remote State",      detail: "State in S3 with DynamoDB lock, versioning, and SSE-S3. No local state files — drift is tracked centrally, lock prevents concurrent corruption." },
-      { node: "ECS / VPC",    badge: "Network Isolation", detail: "VPC module provisions private-only subnets for ECS tasks. Public subnets are ALB/NAT only — no direct workload exposure to the internet." },
-      { node: "ECR",          badge: "Immutable Tags",    detail: "ECR repo created via Terraform with immutable image tags and scan-on-push enabled. Image overwrite is denied at the registry level." },
+      { node: "Terraform",    badge: "Hardened Modules",  detail: "Modules enforce encryption-at-rest, deny public S3 ACLs, and scope IAM roles to least privilege by default. Secure configuration is the default, not an option." },
+      { node: "Plan / Apply", badge: "Remote State",      detail: "State stored in S3 with DynamoDB lock, versioning, and SSE-S3. No local state files — drift tracked centrally, concurrent corruption prevented by lock." },
+      { node: "Lambda",       badge: "Execution Role",    detail: "Each Lambda has its own execution role, created via Terraform and scoped to the exact S3 prefixes it reads and writes. No shared roles between functions." },
+      { node: "S3",           badge: "Bucket Hardening",  detail: "S3 modules enforce server-side encryption, block-public-access at bucket and account level, and enable versioning by default on all data prefixes." },
     ],
   },
   "zero-trust": {
     title: "Zero Trust Architecture",
     points: [
-      { node: "Terraform",    badge: "IAM Least Priv",      detail: "All roles use condition keys (aws:SourceVpc, aws:CalledVia). No wildcard resources. Roles are scoped to the specific actions each service requires." },
-      { node: "ECR",          badge: "Private Registry",    detail: "ECR access requires explicit IAM binding. No public repos. Cross-account access blocked by resource policy by default." },
-      { node: "Plan / Apply", badge: "Apply Gate",          detail: "Terraform apply only proceeds after tfsec passes clean. The IAM role used for apply is scoped to the minimum required actions — no AdministratorAccess." },
-      { node: "ECS / VPC",    badge: "Task Role Isolation", detail: "Task role and execution role are separate. ECS tasks have no public IPs. Security groups are deny-all inbound — ALB is the only ingress path." },
+      { node: "Terraform",    badge: "IAM Least Priv",      detail: "All roles use condition keys (aws:CalledVia, aws:SourceAccount). No wildcard resources or actions. Each role carries only the permissions its service requires." },
+      { node: "Lambda",       badge: "Role Isolation",      detail: "Collector, Enricher, Scorer, and Correlator each have separate IAM roles. Cross-function access is not possible — compromise of one role does not escalate to others." },
+      { node: "Plan / Apply", badge: "Apply Gate",           detail: "The Terraform execution role is scoped to the minimum required actions. No AdministratorAccess. Apply only proceeds after tfsec passes clean." },
+      { node: "S3",           badge: "Resource Policy",     detail: "S3 bucket resource policy denies access from outside the account. Each bucket prefix is accessible only to the specific Lambda role that owns that stage." },
     ],
   },
   "vuln-mgmt": {
     title: "Vulnerability Management",
     points: [
-      { node: "GitHub Actions", badge: "Trivy CI",        detail: "Trivy scans the container image at build time. CRITICAL CVEs block the ECR push — the vulnerability gate is in CI, not in production." },
-      { node: "ECR",            badge: "Scan-on-Push",    detail: "ECR scan-on-push runs on every image pushed, even outside CI. Scan results are accessible via CLI and trigger Cytrix findings for tracking." },
-      { node: "Terraform",      badge: "Pinned Versions", detail: "All provider versions pinned in terraform.lock.hcl. No floating latest — supply chain drift is prevented at the IaC level." },
-      { node: "ECS / VPC",      badge: "Runtime Defence", detail: "Planned: Falco sidecar for runtime container anomaly detection. Any exec into a running container or unexpected network call triggers an alert.", planned: true },
+      { node: "GH Actions", badge: "pip-audit",        detail: "pip-audit scans Python dependencies on every PR. Known CVEs in requirements.txt fail the build before the Lambda package is deployed." },
+      { node: "GH Actions", badge: "Bandit",           detail: "Bandit static analysis on Lambda code. Flags insecure patterns — subprocess injection, weak crypto, open permissions — at PR time." },
+      { node: "Terraform",  badge: "Pinned Versions",  detail: "All provider versions pinned in terraform.lock.hcl. No floating latest — supply chain drift is prevented at the IaC level." },
+      { node: "Lambda",     badge: "Code Signing",     planned: true, detail: "Planned: Lambda code signing to ensure only verified deployment packages are executed. Unsigned or tampered packages are rejected at invocation." },
     ],
   },
   "logging": {
     title: "Logging & Metrics",
     points: [
-      { node: "GitHub Actions", badge: "CI Audit Log",   detail: "tfsec and Trivy results posted as PR comments and retained as GitHub Actions artifacts. Full CI execution history available for audit." },
-      { node: "Plan / Apply",   badge: "State Audit",    detail: "S3 access logs on the state bucket and DynamoDB lock table track every plan and apply. Terraform state history provides full IaC change audit trail." },
-      { node: "ECS / VPC",      badge: "CloudWatch",     detail: "ECS container logs stream to CloudWatch with 90-day retention. VPC Flow Logs enabled on all subnets — captured and fed into Cytrix for correlation." },
-      { node: "ECR",            badge: "Push Audit",     detail: "Every ECR image push is logged to CloudTrail. Pull access is audited. Tag mutation attempts are blocked and logged via immutable tag policy." },
+      { node: "GH Actions",   badge: "CI Audit Log",    detail: "tfsec, Bandit, and pip-audit results posted as PR comments and retained as CI artifacts. Full pipeline execution history available for audit." },
+      { node: "Plan / Apply", badge: "State Audit",     detail: "S3 access logs on the state bucket and DynamoDB lock table record every plan and apply. Terraform state versioning provides a full IaC change history." },
+      { node: "CloudTrail",   badge: "API Audit",       detail: "CloudTrail enabled multi-region. Every Lambda invocation, S3 write, IAM change, and EventBridge event is logged with 90-day retention via S3 lifecycle policy." },
+      { node: "Lambda",       badge: "CloudWatch Logs", detail: "All Lambda function logs stream to CloudWatch log groups with 90-day retention enforced by Terraform. Log group resource policy restricts access to the function role." },
     ],
   },
   "future": {
     title: "In the Pipeline",
     subtitle: "Planned improvements to the build and deploy security posture",
     points: [
-      { node: "GitHub Actions", badge: "DAST",    planned: true, detail: "OWASP ZAP or Nuclei dynamic scan against a staging environment on every merge to main. Runtime behaviour tested before production deploy." },
-      { node: "GitHub Actions", badge: "SBOM",    planned: true, detail: "Syft generates a Software Bill of Materials at image build time. SBOM attached to ECR image as an OCI attestation for supply chain traceability." },
-      { node: "ECR",            badge: "Cosign",  planned: true, detail: "Image signing with Sigstore Cosign. Only signed images with a valid attestation can be pulled by ECS task definitions — unsigned deploys are blocked." },
-      { node: "Plan / Apply",   badge: "OPA",     planned: true, detail: "Open Policy Agent gates on terraform plan output. Custom policies enforce resource naming conventions, tag compliance, and region restrictions before apply." },
+      { node: "GH Actions",   badge: "SBOM",     planned: true, detail: "Syft generates a Software Bill of Materials for Lambda packages at deploy time. SBOM attached as a build artifact for supply chain traceability and compliance." },
+      { node: "GH Actions",   badge: "DAST",     planned: true, detail: "OWASP ZAP or Nuclei dynamic scan against a staging Lambda invoke endpoint on every merge to main. Runtime behaviour validated before production deploy." },
+      { node: "Plan / Apply", badge: "OPA",      planned: true, detail: "Open Policy Agent gates on terraform plan JSON output. Custom policies enforce tag compliance, naming conventions, and region restrictions before apply." },
+      { node: "Lambda",       badge: "Powertools",planned: true, detail: "AWS Lambda Powertools structured logging, tracing (X-Ray), and metrics across all 4 Lambda functions. Enables request-level correlation and SLO tracking." },
     ],
   },
 };
 
-// ─── Color palette ──────────────────────────────────────────────────────────
-const colorMap = {
-  cyan:    { btn: "border-cyan-500/40 text-cyan-400 bg-cyan-500/10",         active: "border-cyan-400 bg-cyan-500/20 text-cyan-300",         node: "border-cyan-400 bg-cyan-500/10 shadow-cyan-500/30",     dot: "bg-cyan-400",    ring: "bg-cyan-400",   line: "bg-cyan-400",    badge: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",       heading: "text-cyan-300"    },
-  emerald: { btn: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10", active: "border-emerald-400 bg-emerald-500/20 text-emerald-300", node: "border-emerald-400 bg-emerald-500/10 shadow-emerald-500/30", dot: "bg-emerald-400", ring: "bg-emerald-400", line: "bg-emerald-400", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", heading: "text-emerald-300" },
-  violet:  { btn: "border-violet-500/40 text-violet-400 bg-violet-500/10",   active: "border-violet-400 bg-violet-500/20 text-violet-300",   node: "border-violet-400 bg-violet-500/10 shadow-violet-500/30",   dot: "bg-violet-400",  ring: "bg-violet-400",  line: "bg-violet-400",  badge: "bg-violet-500/15 text-violet-300 border-violet-500/30",  heading: "text-violet-300"  },
-  amber:   { btn: "border-amber-500/40 text-amber-400 bg-amber-500/10",       active: "border-amber-400 bg-amber-500/20 text-amber-300",       node: "border-amber-400 bg-amber-500/10 shadow-amber-500/30",       dot: "bg-amber-400",   ring: "bg-amber-400",   line: "bg-amber-400",   badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",     heading: "text-amber-300"   },
-  rose:    { btn: "border-rose-500/40 text-rose-400 bg-rose-500/10",          active: "border-rose-400 bg-rose-500/20 text-rose-300",          node: "border-rose-400 bg-rose-500/10 shadow-rose-500/30",          dot: "bg-rose-400",    ring: "bg-rose-400",    line: "bg-rose-400",    badge: "bg-rose-500/15 text-rose-300 border-rose-500/30",        heading: "text-rose-300"    },
-  indigo:  { btn: "border-indigo-500/40 text-indigo-400 bg-indigo-500/10",    active: "border-indigo-400 bg-indigo-500/20 text-indigo-300",    node: "border-indigo-400 bg-indigo-500/10 shadow-indigo-500/30",    dot: "bg-indigo-400",  ring: "bg-indigo-400",  line: "bg-indigo-400",  badge: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",  heading: "text-indigo-300"  },
-};
-
-// ─── Node circle ──────────────────────────────────────────────────────────
+// ─── Node circle (small) ──────────────────────────────────────────────────
 function NodeCircle({ node, highlighted, activeColor }: {
   node: PipelineNode;
   highlighted: boolean;
   activeColor: typeof colorMap[keyof typeof colorMap] | null;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 relative">
-      {/* Pulse rings */}
+    <div className="flex flex-col items-center gap-1.5 relative">
       {highlighted && activeColor && (
         <>
           <div className={`absolute rounded-full ${activeColor.ring} opacity-0 animate-node-ring`}
-            style={{ width: 56, height: 56, top: 0 }} />
+            style={{ width: 32, height: 32, top: 0 }} />
           <div className={`absolute rounded-full ${activeColor.ring} opacity-0 animate-node-ring`}
-            style={{ width: 56, height: 56, top: 0, animationDelay: "0.8s" }} />
+            style={{ width: 32, height: 32, top: 0, animationDelay: "0.8s" }} />
         </>
       )}
       <motion.div
-        animate={{ opacity: highlighted ? 1 : 0.18, scale: highlighted ? 1 : 0.92 }}
+        animate={{ opacity: highlighted ? 1 : 0.18, scale: highlighted ? 1 : 0.9 }}
         transition={{ duration: 0.25 }}
-        className={`relative z-10 w-14 h-14 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
+        className={`relative z-10 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${
           highlighted && activeColor
-            ? `${activeColor.node} shadow-lg`
+            ? `${activeColor.node} shadow-md`
             : "border-slate-700/50 bg-slate-900/80"
         }`}
       >
@@ -185,11 +193,11 @@ function NodeCircle({ node, highlighted, activeColor }: {
       </motion.div>
       <div className="text-center">
         <motion.p animate={{ opacity: highlighted ? 1 : 0.2 }} transition={{ duration: 0.25 }}
-          className="text-xs font-semibold text-slate-200 leading-tight whitespace-nowrap">
+          className="text-[11px] font-semibold text-slate-200 leading-tight whitespace-nowrap">
           {node.label}
         </motion.p>
         <motion.p animate={{ opacity: highlighted ? 0.5 : 0.12 }} transition={{ duration: 0.25 }}
-          className="text-[10px] text-slate-500 leading-tight whitespace-nowrap mt-0.5">
+          className="text-[9px] text-slate-500 leading-tight whitespace-nowrap mt-0.5">
           {node.sublabel}
         </motion.p>
       </div>
@@ -197,33 +205,20 @@ function NodeCircle({ node, highlighted, activeColor }: {
   );
 }
 
-// ─── Connector with gate badge ─────────────────────────────────────────────
-function Connector({ active, c, gate }: {
+// ─── Card-to-card connector ────────────────────────────────────────────────
+function CardConnector({ active, c }: {
   active: boolean;
   c: typeof colorMap[keyof typeof colorMap] | null;
-  gate: string;
 }) {
   return (
-    <div className="flex-1 relative flex items-center" style={{ height: 56 }}>
-      {/* Line */}
-      <div className={`w-full h-px transition-all duration-300 ${active && c ? `${c.line} opacity-60` : "bg-slate-700/25"}`} />
-      {/* Arrow tip */}
+    <div className="flex items-center flex-shrink-0 w-12 relative">
+      <div className={`w-full h-px transition-all duration-300 ${active && c ? `${c.line} opacity-70` : "bg-slate-700/30"}`} />
       <div className={`absolute right-0 flex-shrink-0 transition-colors duration-300 ${active && c ? c.dot : "bg-slate-700/35"}`}
         style={{ width: 5, height: 5, clipPath: "polygon(0 20%, 100% 50%, 0 80%)" }} />
-      {/* Animated packets */}
       {active && c && [0, 1].map(i => (
         <div key={i} className={`absolute w-1.5 h-1.5 rounded-full ${c.dot} animate-travel-packet`}
-          style={{ animationDelay: `${i * 0.7}s`, top: "50%", transform: "translateY(-50%)" }} />
+          style={{ animationDelay: `${i * 0.8}s`, top: "50%", transform: "translateY(-50%)" }} />
       ))}
-      {/* Gate badge */}
-      <div className="absolute left-1/2 z-10 pointer-events-none"
-        style={{ top: "50%", transform: "translate(-50%, -50%)" }}>
-        <span className={`inline-block text-[9px] font-mono px-1.5 py-0.5 rounded-sm border transition-all duration-300 whitespace-nowrap ${
-          active && c ? `${c.badge}` : "bg-slate-950 border-slate-700/40 text-slate-600"
-        }`}>
-          {gate}
-        </span>
-      </div>
     </div>
   );
 }
@@ -234,6 +229,9 @@ export default function ApplicationFlow() {
 
   const activeFilterDef = FILTERS.find(f => f.id === activeFilter);
   const activeColor = activeFilterDef ? colorMap[activeFilterDef.color] : null;
+
+  const laneHasMatch = (lane: SwimLane) =>
+    !activeFilter || lane.nodes.some(n => n.tags.includes(activeFilter));
 
   const isHighlighted = (node: PipelineNode) =>
     !activeFilter || node.tags.includes(activeFilter);
@@ -253,7 +251,7 @@ export default function ApplicationFlow() {
             Security at <span className="gradient-text">Every Phase</span>
           </h2>
           <p className="text-slate-400 max-w-xl mx-auto">
-            How security is built into the development and deployment pipeline. Click a layer to see where it is enforced.
+            How security is built into every stage of development and deployment. Click a layer to see where it is enforced.
           </p>
         </motion.div>
 
@@ -275,84 +273,75 @@ export default function ApplicationFlow() {
           })}
         </motion.div>
 
-        {/* ── Swimlane diagram (desktop) ── */}
+        {/* ── Swimlane cards (desktop) ── */}
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
-          transition={{ delay: 0.15 }} className="hidden md:block">
+          transition={{ delay: 0.15 }} className="hidden md:flex items-center justify-center gap-0">
+          {LANES.map((lane, laneIdx) => {
+            const laneActive = laneHasMatch(lane);
+            const nextLane = LANES[laneIdx + 1];
+            const connectorActive = !!activeFilter && laneActive && !!nextLane && laneHasMatch(nextLane);
 
-          {/* Swimlane container */}
-          <div className="rounded-xl border border-slate-800/60 overflow-hidden">
-
-            {/* Swimlane header row */}
-            <div className="grid border-b border-slate-800/60" style={{ gridTemplateColumns: "1fr 1fr 2fr" }}>
-              {SWIMLANES.map((sw, i) => (
-                <div key={sw.label}
-                  className={`py-3 px-6 text-center text-[11px] font-mono tracking-wider uppercase text-slate-500 ${
-                    i < SWIMLANES.length - 1 ? "border-r border-slate-800/60" : ""
-                  } bg-slate-900/60`}>
-                  {sw.label}
-                </div>
-              ))}
-            </div>
-
-            {/* Pipeline rows */}
-            <div className="bg-slate-950/40">
-              {ROWS.map((row, rowIdx) => {
-                const [n1, n2, n3] = row.nodeIds.map(id => NODES[id]);
-                const [g1, g2] = row.gates;
-                const rowActive = !!activeFilter && row.rowTags.includes(activeFilter);
-                const c1Active = rowActive && isHighlighted(n1) && isHighlighted(n2);
-                const c2Active = rowActive && isHighlighted(n2) && isHighlighted(n3);
-
-                return (
-                  <div key={rowIdx}
-                    className={`flex items-center px-6 py-8 ${rowIdx > 0 ? "border-t border-slate-800/40" : ""}`}>
-                    {/* Col 1: Dev Laptop node */}
-                    <div className="flex items-center justify-center" style={{ width: "calc((100% - 2 * (100% / 3)) / 1)" }}>
-                      <NodeCircle node={n1} highlighted={isHighlighted(n1)} activeColor={activeColor} />
-                    </div>
-
-                    {/* Connector 1 + Col 2: GitHub node + Connector 2 + Col 3: AWS node */}
-                    {/* We use flex to fill the remaining space */}
-                    <div className="flex flex-1 items-center">
-                      {/* Connector 1 (Dev Laptop → GitHub) */}
-                      <Connector active={c1Active} c={activeColor} gate={g1} />
-
-                      {/* GitHub node - centered in its third */}
-                      <div className="flex items-center justify-center flex-none px-6">
-                        <NodeCircle node={n2} highlighted={isHighlighted(n2)} activeColor={activeColor} />
-                      </div>
-
-                      {/* Connector 2 (GitHub → AWS) */}
-                      <Connector active={c2Active} c={activeColor} gate={g2} />
-
-                      {/* AWS node */}
-                      <div className="flex items-center justify-center flex-none pl-6">
-                        <NodeCircle node={n3} highlighted={isHighlighted(n3)} activeColor={activeColor} />
-                      </div>
-                    </div>
+            return (
+              <div key={lane.id} className="flex items-center">
+                {/* Card */}
+                <motion.div
+                  animate={{ opacity: laneActive ? 1 : 0.25 }}
+                  transition={{ duration: 0.25 }}
+                  className={`rounded-xl border bg-slate-900/60 transition-all duration-300 ${
+                    activeFilter && activeColor && laneActive
+                      ? `${activeColor.card} shadow-lg`
+                      : "border-slate-800/70"
+                  }`}
+                  style={{ minWidth: 160 }}
+                >
+                  {/* Card header */}
+                  <div className={`flex items-center justify-center gap-1.5 px-4 py-2.5 border-b text-slate-500 text-[10px] font-mono tracking-wider uppercase ${
+                    activeFilter && activeColor && laneActive ? "border-current opacity-60" : "border-slate-800/60"
+                  }`}>
+                    <span className={activeFilter && activeColor && laneActive ? activeColor.heading : "text-slate-600"}>
+                      {lane.headerIcon}
+                    </span>
+                    {lane.label}
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Vertical swimlane dividers overlay hint text */}
-          {!activeFilter && (
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              className="text-center text-xs text-slate-700 mt-4 font-mono">
-              select a security layer above to highlight where it is enforced
-            </motion.p>
-          )}
+                  {/* Nodes */}
+                  <div className="flex items-start justify-center gap-6 px-6 py-5">
+                    {lane.nodes.map(node => (
+                      <NodeCircle key={node.id} node={node} highlighted={isHighlighted(node)} activeColor={activeColor} />
+                    ))}
+                  </div>
+                </motion.div>
+
+                {/* Connector to next card */}
+                {nextLane && (
+                  <CardConnector active={connectorActive} c={activeColor} />
+                )}
+              </div>
+            );
+          })}
         </motion.div>
 
-        {/* Mobile: simple grid */}
-        <div className="grid grid-cols-2 gap-4 md:hidden">
-          {Object.values(NODES).map(node => (
-            <div key={node.id} className="flex justify-center py-4">
-              <NodeCircle node={node} highlighted={isHighlighted(node)} activeColor={activeColor} />
+        {/* Mobile: stacked cards */}
+        <div className="flex flex-col gap-4 md:hidden">
+          {LANES.map(lane => (
+            <div key={lane.id} className="rounded-xl border border-slate-800/70 bg-slate-900/60 p-4">
+              <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-3">{lane.label}</p>
+              <div className="flex gap-6 flex-wrap">
+                {lane.nodes.map(node => (
+                  <NodeCircle key={node.id} node={node} highlighted={isHighlighted(node)} activeColor={activeColor} />
+                ))}
+              </div>
             </div>
           ))}
         </div>
+
+        {/* Idle hint */}
+        {!activeFilter && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            className="text-center text-xs text-slate-700 mt-5 font-mono">
+            select a security layer above to highlight where it is enforced
+          </motion.p>
+        )}
 
         {/* ── Detail panel ── */}
         <AnimatePresence mode="wait">
