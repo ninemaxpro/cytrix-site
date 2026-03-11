@@ -8,6 +8,7 @@ import TerminalDemo from "@/components/TerminalDemo";
 import FeatureCards from "@/components/FeatureCards";
 import TechStack from "@/components/TechStack";
 import DesignDecisions from "@/components/DesignDecisions";
+import Roadmap from "@/components/Roadmap";
 import FeedbackCTA from "@/components/FeedbackCTA";
 import Footer from "@/components/Footer";
 
@@ -22,6 +23,7 @@ export default function Home() {
       <FeatureCards />
       <TechStack />
       <DesignDecisions />
+      <Roadmap />
       <FeedbackCTA />
       <Footer />
     </main>
