@@ -119,3 +119,9 @@ body {
 .animate-node-ring {
   animation: node-ring 1.6s ease-out infinite;
 }
+
+/* SVG edge march animation */
+@keyframes dash-march {
+  from { stroke-dashoffset: 32; }
+  to   { stroke-dashoffset: 0;  }
+}
