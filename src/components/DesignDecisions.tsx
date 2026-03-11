@@ -34,6 +34,11 @@ const decisions = [
     answer:
       "Each Lambda has scoped IAM permissions (collector can read scanner buckets, scorer can only read/write its prefixes). A monolith would need union permissions — violating least privilege. Separate functions also mean independent scaling, isolated failures, and clearer CloudWatch logs.",
   },
+  {
+    question: "Why no alert deduplication or suppression logic?",
+    answer:
+      "At current scale (46 findings, 15-minute scan cadence) it is not a pain point. But at enterprise scale with thousands of resources, the same P1 finding fires every cycle — 96 notifications per day from one misconfiguration. The correct solution is a deduplication window (suppress re-alerts for the same finding_id for 24h after first notification) plus an accepted-risk suppression list for known exceptions. This was left out of v1 deliberately — premature suppression logic can silently mask genuine regressions. The next iteration builds this on top of the correlated/ prefix, where finding identity is already stable.",
+  },
 ];
 
 export default function DesignDecisions() {
