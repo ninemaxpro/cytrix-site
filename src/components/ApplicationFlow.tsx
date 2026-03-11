@@ -440,7 +440,7 @@ export default function ApplicationFlow() {
               <div className="flex items-start flex-wrap gap-0">
                 {STACK_PIPELINE.map((node, i) => (
                   <div key={node.id} className="flex items-start">
-                    <NodeCircle node={node} highlighted={!activeFilter} activeColor={activeColor} small />
+                    <NodeCircle node={node} highlighted={true} activeColor={null} small />
                     {i < STACK_PIPELINE.length - 1 && <MiniConnector />}
                   </div>
                 ))}
@@ -455,7 +455,7 @@ export default function ApplicationFlow() {
               <p className="text-[9px] font-mono text-slate-700 uppercase tracking-wider mb-3">Supporting Services</p>
               <div className="flex items-start flex-wrap gap-6">
                 {STACK_SUPPORT.map(node => (
-                  <NodeCircle key={node.id} node={node} highlighted={!activeFilter} activeColor={activeColor} small />
+                  <NodeCircle key={node.id} node={node} highlighted={true} activeColor={null} small />
                 ))}
               </div>
             </div>
