@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Filters ───────────────────────────────────────────────────────────────
@@ -69,19 +69,44 @@ const nodes: PipelineNode[] = [
   },
 ];
 
-// ─── Detail panel content ──────────────────────────────────────────────────
-interface FilterPoint {
-  node: string;
-  detail: string;
-  badge: string;
-  planned?: boolean;
-}
+// ─── Lane definitions ─────────────────────────────────────────────────────
+// 3 input lanes converge into the output lane via the bracket connector.
 
-interface FilterDetail {
-  title: string;
-  subtitle?: string;
-  points: FilterPoint[];
-}
+const INPUT_LANES: { nodeIds: string[]; label: string; filters: Set<FilterId> }[] = [
+  {
+    label: "shift-left",
+    nodeIds: ["dev", "github-actions"],
+    filters: new Set<FilterId>(["shift-left", "logging", "future"]),
+  },
+  {
+    label: "infra",
+    nodeIds: ["terraform", "ecr"],
+    filters: new Set<FilterId>(["terraform", "zero-trust", "shift-left"]),
+  },
+  {
+    label: "runtime",
+    nodeIds: ["ecs"],
+    filters: new Set<FilterId>(["zero-trust", "terraform", "logging"]),
+  },
+];
+
+const OUTPUT_NODE_IDS = ["cytrix", "output", "notify"];
+
+// Bracket geometry — 3 equal rows of 120px = 360px total
+const LANE_H = 360;
+const BRACKET_W = 52;
+const MID_X = BRACKET_W / 2;
+const LANE_CY = [LANE_H / 6, LANE_H / 2, (LANE_H * 5) / 6]; // 60, 180, 300
+
+// Hex values for SVG strokes (Tailwind doesn't reach into SVG)
+const COLOR_HEX: Record<string, string> = {
+  cyan: "#22d3ee", emerald: "#34d399", violet: "#8b5cf6",
+  amber: "#f59e0b", rose: "#f43f5e",  indigo: "#818cf8",
+};
+
+// ─── Detail panel content ──────────────────────────────────────────────────
+interface FilterPoint { node: string; detail: string; badge: string; planned?: boolean; }
+interface FilterDetail { title: string; subtitle?: string; points: FilterPoint[]; }
 
 const filterDetails: Record<FilterId, FilterDetail> = {
   "shift-left": {
@@ -105,28 +130,28 @@ const filterDetails: Record<FilterId, FilterDetail> = {
   "zero-trust": {
     title: "Zero Trust Architecture",
     points: [
-      { node: "Terraform",  badge: "IAM Least Priv",       detail: "All roles use condition keys (aws:SourceVpc, aws:CalledVia). No wildcard resources. Roles scoped to specific services." },
-      { node: "ECR",        badge: "Private Registry",      detail: "ECR access requires explicit IAM binding. No public repos. Cross-account access blocked by resource policy." },
-      { node: "ECS / VPC",  badge: "Network Zero Trust",    detail: "ECS tasks have no public IPs. Security groups are deny-all inbound by default — ALB is the only ingress point." },
-      { node: "ECS / VPC",  badge: "Task Role Isolation",   detail: "Task role and task execution role are separate. Task role carries only the permissions the container code requires." },
+      { node: "Terraform",  badge: "IAM Least Priv",     detail: "All roles use condition keys (aws:SourceVpc, aws:CalledVia). No wildcard resources. Roles scoped to specific services." },
+      { node: "ECR",        badge: "Private Registry",    detail: "ECR access requires explicit IAM binding. No public repos. Cross-account access blocked by resource policy." },
+      { node: "ECS / VPC",  badge: "Network Zero Trust",  detail: "ECS tasks have no public IPs. Security groups are deny-all inbound by default — ALB is the only ingress point." },
+      { node: "ECS / VPC",  badge: "Task Role Isolation", detail: "Task role and task execution role are separate. Task role carries only the permissions the container code requires." },
     ],
   },
   "vuln-mgmt": {
     title: "Vulnerability Management",
     points: [
-      { node: "ECR",          badge: "Build-time Scan",    detail: "ECR scan-on-push catches OS and package CVEs at build time. CRITICAL findings block deployment via CI gate." },
-      { node: "Cytrix Engine",badge: "Continuous Scan",    detail: "Prowler CSPM runs every 15 min via EventBridge across 200+ AWS security checks. Trivy scans live containers and IaC." },
-      { node: "Cytrix Engine",badge: "KEV + EPSS",         detail: "Each finding enriched with CISA KEV and OSV.dev data. EPSS score surfaces exploitability, not just severity." },
-      { node: "CLI / Grafana",badge: "Risk Scoring",       detail: "Weighted formula (CVSS + EPSS + exposure + blast radius + KEV match) produces P1–P4 tiers. P1s auto-trigger CloudTrail correlation." },
+      { node: "ECR",          badge: "Build-time Scan", detail: "ECR scan-on-push catches OS and package CVEs at build time. CRITICAL findings block deployment via CI gate." },
+      { node: "Cytrix Engine",badge: "Continuous Scan", detail: "Prowler CSPM runs every 15 min via EventBridge across 200+ AWS security checks. Trivy scans live containers and IaC." },
+      { node: "Cytrix Engine",badge: "KEV + EPSS",      detail: "Each finding enriched with CISA KEV and OSV.dev data. EPSS score surfaces exploitability, not just severity." },
+      { node: "CLI / Grafana",badge: "Risk Scoring",    detail: "Weighted formula (CVSS + EPSS + exposure + blast radius + KEV match) produces P1–P4 tiers. P1s auto-trigger CloudTrail correlation." },
     ],
   },
   "logging": {
     title: "Logging & Metrics",
     points: [
-      { node: "GitHub Actions", badge: "CI Audit Log",  detail: "tfsec and Trivy results posted as PR comments. Full CI execution history retained in GitHub for audit trail." },
-      { node: "ECS / VPC",      badge: "CloudWatch",    detail: "ECS container logs stream to CloudWatch with 90-day retention. VPC Flow Logs on all subnets ingested by Cytrix." },
-      { node: "Cytrix Engine",  badge: "CloudTrail",    detail: "All Lambda invocations, S3 writes, and EventBridge events logged. CloudTrail enabled multi-region for API-level audit." },
-      { node: "CLI / Grafana",  badge: "Grafana",       detail: "Grafana dashboards show finding trends, score distribution, tool health, and pipeline latency. Alerts on P1 spike or pipeline failure." },
+      { node: "GitHub Actions", badge: "CI Audit Log", detail: "tfsec and Trivy results posted as PR comments. Full CI execution history retained in GitHub for audit trail." },
+      { node: "ECS / VPC",      badge: "CloudWatch",   detail: "ECS container logs stream to CloudWatch with 90-day retention. VPC Flow Logs on all subnets ingested by Cytrix." },
+      { node: "Cytrix Engine",  badge: "CloudTrail",   detail: "All Lambda invocations, S3 writes, and EventBridge events logged. CloudTrail enabled multi-region for API-level audit." },
+      { node: "CLI / Grafana",  badge: "Grafana",      detail: "Grafana dashboards show finding trends, score distribution, tool health, and pipeline latency. Alerts on P1 spike or pipeline failure." },
     ],
   },
   "future": {
@@ -134,27 +159,19 @@ const filterDetails: Record<FilterId, FilterDetail> = {
     subtitle: "Planned features — architecture defined, not yet deployed",
     points: [
       {
-        node: "GitHub Actions",
-        badge: "CI Adapter",
-        planned: true,
+        node: "GitHub Actions", badge: "CI Adapter", planned: true,
         detail: "tfsec and Trivy findings from every PR flow into Cytrix as first-class findings. Shift-left detections score and rank alongside runtime scans — CI regressions become P3/P4 findings.",
       },
       {
-        node: "Cytrix Engine",
-        badge: "Lambda 5 · Notifier",
-        planned: true,
+        node: "Cytrix Engine", badge: "Lambda 5 · Notifier", planned: true,
         detail: "Fifth Lambda triggered by correlated/ writes. Reads the CloudTrail attack hypothesis, attaches the top guardrail recommendation and Terraform snippet, publishes to SNS within 30s of correlation.",
       },
       {
-        node: "SNS / Email",
-        badge: "Alert Delivery",
-        planned: true,
+        node: "SNS / Email", badge: "Alert Delivery", planned: true,
         detail: "aws_sns_topic + email subscription via Terraform variable. P1/P2 alerts land in the security inbox with score, blast radius, CloudTrail timeline, and one-click remediation — loop closed.",
       },
       {
-        node: "CLI / Grafana",
-        badge: "Posture Dashboard",
-        planned: true,
+        node: "CLI / Grafana", badge: "Posture Dashboard", planned: true,
         detail: "Tag-driven compliance view mapping resources to Zero Trust, Least Privilege, and Data Protection concepts. Shows per-concept coverage — which resources are compliant and which are exposed.",
       },
     ],
@@ -163,15 +180,15 @@ const filterDetails: Record<FilterId, FilterDetail> = {
 
 // ─── Color palette ─────────────────────────────────────────────────────────
 const colorMap = {
-  cyan:    { btn: "border-cyan-500/40 text-cyan-400 bg-cyan-500/10",         active: "border-cyan-400 bg-cyan-500/20 text-cyan-300",         node: "border-cyan-400 bg-cyan-500/15 shadow-cyan-500/40",       dot: "bg-cyan-400",    ring: "bg-cyan-400",    line: "bg-cyan-400",    badge: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",       heading: "text-cyan-300"    },
+  cyan:    { btn: "border-cyan-500/40 text-cyan-400 bg-cyan-500/10",         active: "border-cyan-400 bg-cyan-500/20 text-cyan-300",         node: "border-cyan-400 bg-cyan-500/15 shadow-cyan-500/40",         dot: "bg-cyan-400",    ring: "bg-cyan-400",    line: "bg-cyan-400",    badge: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",       heading: "text-cyan-300"    },
   emerald: { btn: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10", active: "border-emerald-400 bg-emerald-500/20 text-emerald-300", node: "border-emerald-400 bg-emerald-500/15 shadow-emerald-500/40", dot: "bg-emerald-400", ring: "bg-emerald-400", line: "bg-emerald-400", badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", heading: "text-emerald-300" },
-  violet:  { btn: "border-violet-500/40 text-violet-400 bg-violet-500/10",   active: "border-violet-400 bg-violet-500/20 text-violet-300",   node: "border-violet-400 bg-violet-500/15 shadow-violet-500/40",  dot: "bg-violet-400",  ring: "bg-violet-400",  line: "bg-violet-400",  badge: "bg-violet-500/15 text-violet-300 border-violet-500/30",  heading: "text-violet-300"  },
-  amber:   { btn: "border-amber-500/40 text-amber-400 bg-amber-500/10",       active: "border-amber-400 bg-amber-500/20 text-amber-300",       node: "border-amber-400 bg-amber-500/15 shadow-amber-500/40",     dot: "bg-amber-400",   ring: "bg-amber-400",   line: "bg-amber-400",   badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",     heading: "text-amber-300"   },
-  rose:    { btn: "border-rose-500/40 text-rose-400 bg-rose-500/10",          active: "border-rose-400 bg-rose-500/20 text-rose-300",          node: "border-rose-400 bg-rose-500/15 shadow-rose-500/40",        dot: "bg-rose-400",    ring: "bg-rose-400",    line: "bg-rose-400",    badge: "bg-rose-500/15 text-rose-300 border-rose-500/30",        heading: "text-rose-300"    },
-  indigo:  { btn: "border-indigo-500/40 text-indigo-400 bg-indigo-500/10",    active: "border-indigo-400 bg-indigo-500/20 text-indigo-300",    node: "border-indigo-400 bg-indigo-500/15 shadow-indigo-500/40",  dot: "bg-indigo-400",  ring: "bg-indigo-400",  line: "bg-indigo-400",  badge: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",  heading: "text-indigo-300"  },
+  violet:  { btn: "border-violet-500/40 text-violet-400 bg-violet-500/10",   active: "border-violet-400 bg-violet-500/20 text-violet-300",   node: "border-violet-400 bg-violet-500/15 shadow-violet-500/40",   dot: "bg-violet-400",  ring: "bg-violet-400",  line: "bg-violet-400",  badge: "bg-violet-500/15 text-violet-300 border-violet-500/30",  heading: "text-violet-300"  },
+  amber:   { btn: "border-amber-500/40 text-amber-400 bg-amber-500/10",       active: "border-amber-400 bg-amber-500/20 text-amber-300",       node: "border-amber-400 bg-amber-500/15 shadow-amber-500/40",       dot: "bg-amber-400",   ring: "bg-amber-400",   line: "bg-amber-400",   badge: "bg-amber-500/15 text-amber-300 border-amber-500/30",     heading: "text-amber-300"   },
+  rose:    { btn: "border-rose-500/40 text-rose-400 bg-rose-500/10",          active: "border-rose-400 bg-rose-500/20 text-rose-300",          node: "border-rose-400 bg-rose-500/15 shadow-rose-500/40",          dot: "bg-rose-400",    ring: "bg-rose-400",    line: "bg-rose-400",    badge: "bg-rose-500/15 text-rose-300 border-rose-500/30",        heading: "text-rose-300"    },
+  indigo:  { btn: "border-indigo-500/40 text-indigo-400 bg-indigo-500/10",    active: "border-indigo-400 bg-indigo-500/20 text-indigo-300",    node: "border-indigo-400 bg-indigo-500/15 shadow-indigo-500/40",    dot: "bg-indigo-400",  ring: "bg-indigo-400",  line: "bg-indigo-400",  badge: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",  heading: "text-indigo-300"  },
 };
 
-// ─── Connector with animated packets ──────────────────────────────────────
+// ─── Inline flow connector (within a lane) ────────────────────────────────
 function FlowConnector({ active, c, dashed }: {
   active: boolean;
   c: typeof colorMap[keyof typeof colorMap] | null;
@@ -179,28 +196,59 @@ function FlowConnector({ active, c, dashed }: {
 }) {
   const PACKETS = 3;
   return (
-    <div className="flex-1 relative flex items-center h-[4.5rem] min-w-0">
-      {/* Base line */}
-      <div
-        className={`w-full h-px transition-all duration-400 ${active && c ? `${c.line} opacity-50` : "bg-slate-700/30"} ${dashed ? "opacity-30" : ""}`}
-        style={dashed && !active ? { backgroundImage: "repeating-linear-gradient(90deg,rgb(99,102,241,0.25) 0,rgb(99,102,241,0.25) 6px,transparent 6px,transparent 12px)", background: "none", height: 1 } : undefined}
+    <div className="flex-1 relative flex items-center h-[4.5rem] min-w-0" style={{ minWidth: "1rem" }}>
+      <div className={`w-full h-px transition-all duration-300 ${active && c ? `${c.line} opacity-50` : "bg-slate-700/30"}`}
+        style={dashed && !active ? { backgroundImage: "repeating-linear-gradient(90deg,rgba(99,102,241,0.25) 0,rgba(99,102,241,0.25) 6px,transparent 6px,transparent 12px)", background: "none", height: 1 } : undefined}
       />
-
-      {/* Arrow head */}
-      <div
-        className={`absolute right-0 transition-colors duration-300 ${active && c ? c.dot : dashed ? "bg-indigo-500/30" : "bg-slate-700/40"}`}
+      <div className={`absolute right-0 transition-colors duration-300 ${active && c ? c.dot : dashed ? "bg-indigo-500/25" : "bg-slate-700/40"}`}
         style={{ width: 5, height: 5, clipPath: "polygon(0 20%, 100% 50%, 0 80%)" }}
       />
-
-      {/* Animated packets */}
       {active && c && Array.from({ length: PACKETS }).map((_, i) => (
-        <div
-          key={i}
-          className={`absolute w-1.5 h-1.5 rounded-full ${c.dot} animate-travel-packet`}
+        <div key={i} className={`absolute w-1.5 h-1.5 rounded-full ${c.dot} animate-travel-packet`}
           style={{ animationDelay: `${i * 0.6}s`, top: "50%", transform: "translateY(-50%)", boxShadow: "0 0 6px currentColor" }}
         />
       ))}
     </div>
+  );
+}
+
+// ─── SVG convergence bracket ──────────────────────────────────────────────
+function ConvergenceBracket({ lane1Active, lane2Active, lane3Active, colorName }: {
+  lane1Active: boolean;
+  lane2Active: boolean;
+  lane3Active: boolean;
+  colorName: string | null;
+}) {
+  const anyActive = lane1Active || lane2Active || lane3Active;
+  const activeStroke = colorName ? COLOR_HEX[colorName] : "transparent";
+  const idleStroke = "rgb(51,65,85)";
+
+  const seg = (active: boolean) => ({
+    stroke: active ? activeStroke : idleStroke,
+    strokeWidth: 1,
+    strokeOpacity: active ? 0.65 : 0.35,
+    transition: "stroke 0.3s ease, stroke-opacity 0.3s ease",
+  });
+
+  return (
+    <svg width={BRACKET_W} height={LANE_H} viewBox={`0 0 ${BRACKET_W} ${LANE_H}`}
+      className="flex-shrink-0 self-stretch" style={{ overflow: "visible" }}>
+      {/* Lane arms (left side → mid x) */}
+      <line x1={0} y1={LANE_CY[0]} x2={MID_X} y2={LANE_CY[0]} style={seg(lane1Active)} />
+      <line x1={0} y1={LANE_CY[1]} x2={MID_X} y2={LANE_CY[1]} style={seg(lane2Active)} />
+      <line x1={0} y1={LANE_CY[2]} x2={MID_X} y2={LANE_CY[2]} style={seg(lane3Active)} />
+      {/* Vertical bar connecting all lane arms */}
+      <line x1={MID_X} y1={LANE_CY[0]} x2={MID_X} y2={LANE_CY[2]} style={seg(anyActive)} />
+      {/* Output arm (mid x → right edge at center y) */}
+      <line x1={MID_X} y1={LANE_CY[1]} x2={BRACKET_W} y2={LANE_CY[1]} style={seg(anyActive)} />
+      {/* Arrow tip */}
+      {anyActive && colorName && (
+        <polygon
+          points={`${BRACKET_W - 6},${LANE_CY[1] - 3} ${BRACKET_W},${LANE_CY[1]} ${BRACKET_W - 6},${LANE_CY[1] + 3}`}
+          fill={activeStroke} opacity={0.7}
+        />
+      )}
+    </svg>
   );
 }
 
@@ -211,56 +259,37 @@ function PipelineNodeEl({
   node: PipelineNode;
   highlighted: boolean;
   activeColor: typeof colorMap[keyof typeof colorMap] | null;
-  activeFilter: FilterId | null;
+  activeFilter?: FilterId | null;
 }) {
-  // Future nodes are shown as dashed/ghosted when no filter or non-future filter is active
   const isFutureNode = node.future === true;
-  const isIdle = !activeFilter;
-  const showFutureGhost = isFutureNode && (isIdle || (!highlighted));
+  const showFutureGhost = isFutureNode && !highlighted;
 
   return (
     <div className="flex flex-col items-center text-center relative flex-shrink-0" style={{ width: "4.5rem" }}>
-      {/* Outer pulse ring */}
       {highlighted && activeColor && (
-        <div className={`absolute rounded-2xl ${activeColor.ring} opacity-0 animate-node-ring`} style={{ width: "4.5rem", height: "4.5rem", top: 0 }} />
+        <>
+          <div className={`absolute rounded-2xl ${activeColor.ring} opacity-0 animate-node-ring`} style={{ width: "4.5rem", height: "4.5rem", top: 0 }} />
+          <div className={`absolute rounded-2xl ${activeColor.ring} opacity-0 animate-node-ring`} style={{ width: "4.5rem", height: "4.5rem", top: 0, animationDelay: "0.8s" }} />
+        </>
       )}
-      {highlighted && activeColor && (
-        <div className={`absolute rounded-2xl ${activeColor.ring} opacity-0 animate-node-ring`} style={{ width: "4.5rem", height: "4.5rem", top: 0, animationDelay: "0.8s" }} />
-      )}
-
-      {/* Node box */}
       <motion.div
-        animate={{ opacity: highlighted ? 1 : showFutureGhost ? 0.35 : 0.15, scale: highlighted ? 1 : 0.95 }}
+        animate={{ opacity: highlighted ? 1 : showFutureGhost ? 0.3 : 0.15, scale: highlighted ? 1 : 0.95 }}
         transition={{ duration: 0.25 }}
         className={`relative z-10 w-[4.5rem] h-[4.5rem] rounded-2xl border-2 flex items-center justify-center transition-all duration-300 ${
-          highlighted && activeColor
-            ? `${activeColor.node} border-2 shadow-lg`
-            : showFutureGhost
-            ? "border-indigo-500/30 bg-indigo-500/5 text-indigo-400/50 border-dashed"
-            : "border-slate-700/60 bg-slate-900/80 text-slate-500"
+          highlighted && activeColor ? `${activeColor.node} shadow-lg`
+          : showFutureGhost ? "border-indigo-500/25 bg-indigo-500/5"
+          : "border-slate-700/60 bg-slate-900/80 text-slate-500"
         }`}
-        style={showFutureGhost && !highlighted ? { borderStyle: "dashed" } : undefined}
+        style={showFutureGhost ? { borderStyle: "dashed" } : undefined}
       >
-        <span className={highlighted && activeColor ? activeColor.heading : showFutureGhost ? "text-indigo-400/50" : "text-slate-500"}>
+        <span className={highlighted && activeColor ? activeColor.heading : showFutureGhost ? "text-indigo-400/40" : "text-slate-500"}>
           {node.icon}
         </span>
       </motion.div>
-
-      {/* Labels */}
-      <motion.p
-        animate={{ opacity: highlighted ? 1 : showFutureGhost ? 0.4 : 0.15 }}
-        transition={{ duration: 0.25 }}
-        className="mt-2 text-xs font-semibold text-slate-200 leading-tight"
-      >
-        {node.label}
-      </motion.p>
-      <motion.p
-        animate={{ opacity: highlighted ? 0.6 : showFutureGhost ? 0.3 : 0.1 }}
-        transition={{ duration: 0.25 }}
-        className={`text-[10px] mt-0.5 leading-tight ${showFutureGhost && !highlighted ? "text-indigo-400/60" : "text-slate-500"}`}
-      >
-        {node.sublabel}
-      </motion.p>
+      <motion.p animate={{ opacity: highlighted ? 1 : showFutureGhost ? 0.35 : 0.15 }} transition={{ duration: 0.25 }}
+        className="mt-2 text-xs font-semibold text-slate-200 leading-tight">{node.label}</motion.p>
+      <motion.p animate={{ opacity: highlighted ? 0.6 : showFutureGhost ? 0.25 : 0.1 }} transition={{ duration: 0.25 }}
+        className={`text-[10px] mt-0.5 leading-tight ${showFutureGhost ? "text-indigo-400/50" : "text-slate-500"}`}>{node.sublabel}</motion.p>
     </div>
   );
 }
@@ -269,22 +298,20 @@ function PipelineNodeEl({
 export default function ApplicationFlow() {
   const [activeFilter, setActiveFilter] = useState<FilterId | null>(null);
 
-  const activeFilterDef = FILTERS.find((f) => f.id === activeFilter);
+  const activeFilterDef = FILTERS.find(f => f.id === activeFilter);
   const activeColor = activeFilterDef ? colorMap[activeFilterDef.color] : null;
 
+  const laneIsActive = (i: number) => !!activeFilter && INPUT_LANES[i].filters.has(activeFilter);
+  const anyLaneActive = INPUT_LANES.some((_, i) => laneIsActive(i));
+
+  const nodeById = (id: string) => nodes.find(n => n.id === id)!;
   const isHighlighted = (node: PipelineNode) => !activeFilter || node.tags.includes(activeFilter);
 
-  const connectorActive = (a: PipelineNode, b: PipelineNode) =>
-    !!activeFilter && isHighlighted(a) && isHighlighted(b);
-
-  // A connector is "future dashed" if it leads into/out of a future node and no filter is active
-  const connectorIsFuture = (a: PipelineNode, b: PipelineNode) =>
-    !activeFilter && (a.future || b.future);
-
-  const toggle = (id: FilterId) => setActiveFilter((p) => (p === id ? null : id));
-
+  const toggle = (id: FilterId) => setActiveFilter(p => p === id ? null : id);
   const detail = activeFilter ? filterDetails[activeFilter] : null;
   const isFutureTab = activeFilter === "future";
+
+  const outputNodes = OUTPUT_NODE_IDS.map(nodeById);
 
   return (
     <section id="flow" className="py-24 px-6">
@@ -301,117 +328,132 @@ export default function ApplicationFlow() {
         </motion.div>
 
         {/* Filter buttons */}
-        <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }} className="flex flex-wrap justify-center gap-2 mb-14">
-          {FILTERS.map((f) => {
+        <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
+          className="flex flex-wrap justify-center gap-2 mb-14">
+          {FILTERS.map(f => {
             const c = colorMap[f.color];
             const isActive = activeFilter === f.id;
-            const isFuture = f.id === "future";
             return (
-              <button
-                key={f.id}
-                onClick={() => toggle(f.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 cursor-pointer ${
-                  isActive ? c.active : c.btn
-                } ${isFuture ? "border-dashed" : ""}`}
-              >
-                {isFuture && (
-                  <span className="mr-1.5 opacity-70">◎</span>
-                )}
+              <button key={f.id} onClick={() => toggle(f.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium border transition-all duration-200 cursor-pointer ${isActive ? c.active : c.btn} ${f.id === "future" ? "border-dashed" : ""}`}>
+                {f.id === "future" && <span className="mr-1.5 opacity-60">◎</span>}
                 {f.label}
               </button>
             );
           })}
         </motion.div>
 
-        {/* Pipeline row */}
+        {/* ── Pipeline diagram ── */}
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.15 }}>
-          <div className="hidden md:flex items-center px-4">
-            {nodes.map((node, i) => (
-              <>
-                <PipelineNodeEl
-                  key={node.id}
-                  node={node}
-                  highlighted={isHighlighted(node)}
-                  activeColor={activeColor}
-                  activeFilter={activeFilter}
-                />
-                {i < nodes.length - 1 && (
-                  <FlowConnector
-                    key={`conn-${i}`}
-                    active={connectorActive(node, nodes[i + 1])}
-                    c={activeColor}
-                    dashed={connectorIsFuture(node, nodes[i + 1])}
-                  />
-                )}
-              </>
-            ))}
+
+          {/* Desktop: 3-lane convergence layout */}
+          <div className="hidden md:grid px-4" style={{ gridTemplateColumns: `1fr ${BRACKET_W}px auto`, alignItems: "stretch" }}>
+
+            {/* Left: 3 input lanes */}
+            <div className="grid grid-rows-3" style={{ height: `${LANE_H}px` }}>
+              {INPUT_LANES.map((lane, laneIdx) => {
+                const active = laneIsActive(laneIdx);
+                const laneNds = lane.nodeIds.map(nodeById);
+                return (
+                  <div key={lane.label} className="flex items-center">
+                    {laneNds.map((node, i) => (
+                      <Fragment key={node.id}>
+                        <PipelineNodeEl node={node} highlighted={isHighlighted(node)} activeColor={activeColor} activeFilter={activeFilter} />
+                        {i < laneNds.length - 1 && (
+                          <FlowConnector active={active && isHighlighted(node) && isHighlighted(laneNds[i + 1])} c={activeColor} />
+                        )}
+                      </Fragment>
+                    ))}
+                    {/* Trailing line extending to convergence bracket */}
+                    <FlowConnector active={active} c={activeColor} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Center: convergence bracket SVG */}
+            <ConvergenceBracket
+              lane1Active={laneIsActive(0)}
+              lane2Active={laneIsActive(1)}
+              lane3Active={laneIsActive(2)}
+              colorName={activeFilterDef?.color ?? null}
+            />
+
+            {/* Right: output lane (self-center aligns to LANE_CY[1] = middle) */}
+            <div className="flex items-center self-center">
+              {outputNodes.map((node, i) => {
+                const nextNode = outputNodes[i + 1];
+                return (
+                  <Fragment key={node.id}>
+                    <PipelineNodeEl node={node} highlighted={isHighlighted(node)} activeColor={activeColor} activeFilter={activeFilter} />
+                    {nextNode && (
+                      <FlowConnector
+                        active={anyLaneActive && isHighlighted(node) && isHighlighted(nextNode)}
+                        c={activeColor}
+                        dashed={node.future || nextNode.future}
+                      />
+                    )}
+                  </Fragment>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Mobile: 2-column grid fallback */}
+          {/* Mobile: flat 2-col grid */}
           <div className="grid grid-cols-2 gap-4 md:hidden">
-            {nodes.map((node) => (
-              <PipelineNodeEl
-                key={node.id}
-                node={node}
-                highlighted={isHighlighted(node)}
-                activeColor={activeColor}
-                activeFilter={activeFilter}
-              />
+            {nodes.map(node => (
+              <PipelineNodeEl key={node.id} node={node} highlighted={isHighlighted(node)} activeColor={activeColor} activeFilter={activeFilter} />
             ))}
           </div>
         </motion.div>
 
+        {/* Lane labels (desktop only, shown idle) */}
+        {!activeFilter && (
+          <div className="hidden md:grid px-4 mt-2" style={{ gridTemplateColumns: `1fr ${BRACKET_W}px auto` }}>
+            <div className="grid grid-rows-3" style={{ height: "54px" }}>
+              {[
+                { label: "Shift Left", color: "text-cyan-700" },
+                { label: "Infrastructure", color: "text-emerald-700" },
+                { label: "Runtime", color: "text-violet-700" },
+              ].map(({ label, color }) => (
+                <div key={label} className={`flex items-center text-[10px] font-mono ${color} opacity-60`}>
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Detail panel */}
         <AnimatePresence mode="wait">
           {activeFilter && detail && activeColor && (
-            <motion.div
-              key={activeFilter}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.22 }}
-              className="mt-10"
-            >
+            <motion.div key={activeFilter} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.22 }} className="mt-10">
               <div
                 className={`rounded-2xl border bg-slate-900/70 backdrop-blur-sm p-6 ${isFutureTab ? "border-dashed" : ""}`}
                 style={{ borderColor: isFutureTab ? "rgba(99,102,241,0.35)" : "rgba(255,255,255,0.08)" }}
               >
-                {/* Panel heading */}
                 <div className="flex items-center gap-3 mb-1">
-                  <h3 className={`text-lg font-bold ${activeColor.heading}`}>
-                    {detail.title}
-                  </h3>
+                  <h3 className={`text-lg font-bold ${activeColor.heading}`}>{detail.title}</h3>
                   {isFutureTab && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-indigo-500/30 text-indigo-400/70 bg-indigo-500/10 border-dashed">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-dashed border-indigo-500/30 text-indigo-400/70 bg-indigo-500/10">
                       planned
                     </span>
                   )}
                 </div>
-
-                {detail.subtitle && (
-                  <p className="text-xs text-slate-500 font-mono mb-5">{detail.subtitle}</p>
-                )}
+                {detail.subtitle && <p className="text-xs text-slate-500 font-mono mb-5">{detail.subtitle}</p>}
                 {!detail.subtitle && <div className="mb-5" />}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {detail.points.map((point, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.06 }}
-                      className="flex gap-3"
-                    >
-                      {/* Left bar — dashed for planned items */}
+                    <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }} className="flex gap-3">
                       <div
-                        className={`w-0.5 rounded-full flex-shrink-0 self-stretch ${activeColor.dot} ${point.planned ? "opacity-30" : "opacity-50"}`}
+                        className={`w-0.5 rounded-full flex-shrink-0 self-stretch ${activeColor.dot} ${point.planned ? "opacity-25" : "opacity-50"}`}
                         style={point.planned ? { backgroundImage: "repeating-linear-gradient(180deg,currentColor 0,currentColor 4px,transparent 4px,transparent 8px)", background: "none", width: 2 } : undefined}
                       />
-
                       <div>
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="text-[10px] font-mono text-slate-500">{point.node}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${activeColor.badge} ${point.planned ? "border-dashed opacity-80" : ""}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${activeColor.badge} ${point.planned ? "border-dashed opacity-75" : ""}`}>
                             {point.badge}
                           </span>
                         </div>
@@ -429,12 +471,8 @@ export default function ApplicationFlow() {
 
         {/* Idle hint */}
         {!activeFilter && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center text-xs text-slate-700 mt-8 font-mono"
-          >
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+            className="text-center text-xs text-slate-700 mt-6 font-mono">
             select a security layer above to highlight where it is enforced
           </motion.p>
         )}
