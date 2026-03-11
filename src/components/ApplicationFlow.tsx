@@ -21,6 +21,7 @@ const CAT_HEX: Record<string, string> = {
   trigger: "#d97706",
   lambda:  "#0d9488",
   storage: "#3b82f6",
+  output:  "#a78bfa",
 };
 
 // ── Node type ─────────────────────────────────────────────────────────────────
@@ -42,10 +43,11 @@ interface GEdge {
 }
 
 // ── Canvas layout ─────────────────────────────────────────────────────────────
-// Canvas: 1160 × 380
+// Canvas: 1290 × 360
 // CI/CD row       cy = 150   (left of AWS zone)
 // AWS Lambda row  cy = 150   (same row, continues inside AWS zone)
 // AWS S3 row      cy = 275   (below respective Lambda)
+// SecEng laptop   cy = 275   cx = 1210  (outside AWS zone, right)
 
 const NODES: GNode[] = [
   // ── CI/CD Pipeline ──────────────────────────────────────────────────────────
@@ -106,6 +108,11 @@ const NODES: GNode[] = [
   { id: "s3correlated",label: "S3 correlated/",sublabel: "attack stories",
     cx: 1080, cy: 275, tags: ["cytrix"], category: "storage",
     iconPath: "M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" },
+
+  // ── Outside AWS zone — SecEng endpoint ───────────────────────────────────────
+  { id: "seceng",       label: "SecEng",         sublabel: "Cytrix CLI",
+    cx: 1210, cy: 275, tags: ["cytrix"], category: "output",
+    iconPath: "M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" },
 ];
 
 // ── Edges ─────────────────────────────────────────────────────────────────────
@@ -115,8 +122,8 @@ const EDGES: GEdge[] = [
   { id: "gh-ci",      from: "github",       to: "ci",           tags: ["cicd"]   },
   { id: "ci-tfp",     from: "ci",           to: "tfplan",       tags: ["cicd"]   },
   { id: "tfp-tfap",   from: "tfplan",       to: "tfapply",      tags: ["cicd"]   },
-  // TF Apply enters AWS zone
-  { id: "tfap-eb",    from: "tfapply",      to: "eventbridge",  tags: ["cicd", "cytrix"] },
+  // TF Apply enters AWS zone (CI/CD only — provisions infra, does not invoke EB)
+  { id: "tfap-eb",    from: "tfapply",      to: "eventbridge",  tags: ["cicd"] },
   // EventBridge → Collector
   { id: "eb-col",     from: "eventbridge",  to: "collector",    tags: ["cytrix"] },
   // Lambda → S3 (vertical down)
@@ -128,6 +135,8 @@ const EDGES: GEdge[] = [
   { id: "s3r-enr",    from: "s3raw",        to: "enricher",     tags: ["cytrix"] },
   { id: "s3e-scr",    from: "s3enriched",   to: "scorer",       tags: ["cytrix"] },
   { id: "s3s-cor",    from: "s3scored",     to: "correlator",   tags: ["cytrix"] },
+  // S3 correlated → SecEng laptop (Cytrix CLI reads findings)
+  { id: "s3c-sec",    from: "s3correlated", to: "seceng",       tags: ["cytrix"] },
 ];
 
 // ── Flow detail ───────────────────────────────────────────────────────────────
@@ -155,6 +164,7 @@ const FLOW_DETAILS: Record<FilterId, FlowDetail> = {
       { label: "Enricher",     badge: "S3 enriched/",     detail: "KEV + OSV enrichment in 6 passes. Adds CVE context and threat actor tags." },
       { label: "Scorer",       badge: "S3 scored/",       detail: "Weighted formula produces P1-P4 priority tiers. Writes to S3 scored/." },
       { label: "Correlator",   badge: "S3 correlated/",   detail: "CloudTrail investigation groups related findings into attack stories." },
+      { label: "Cytrix CLI",   badge: "SecEng laptop",    detail: "Security engineer runs cytrix findings to pull ranked attack stories directly from S3 correlated/." },
     ],
   },
 };
@@ -226,7 +236,7 @@ export default function ApplicationFlow() {
         {/* ── SVG diagram ── */}
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
           transition={{ delay: 0.15 }} className="hidden md:block overflow-x-auto">
-          <svg viewBox="0 0 1160 360" className="w-full" style={{ minWidth: 680 }}>
+          <svg viewBox="0 0 1290 360" className="w-full" style={{ minWidth: 720 }}>
 
             <defs>
               <marker id="arr-def" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -346,8 +356,9 @@ export default function ApplicationFlow() {
               { label: "Trigger", color: "#d97706" },
               { label: "Lambda",  color: "#0d9488" },
               { label: "Storage", color: "#3b82f6" },
+              { label: "Output",  color: "#a78bfa" },
             ].map((item, i) => (
-              <g key={item.label} transform={`translate(${300 + i * 130}, 346)`}>
+              <g key={item.label} transform={`translate(${280 + i * 120}, 346)`}>
                 <circle r="5" cx="5" cy="5" fill={item.color} opacity="0.7" />
                 <text x="15" y="9" fontSize="9" fontFamily="monospace" fill="#475569">{item.label}</text>
               </g>
