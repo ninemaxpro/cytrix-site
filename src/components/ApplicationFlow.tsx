@@ -113,11 +113,13 @@ const NODES: GNode[] = [
     iconPath: "M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" },
 
   // ── AWS zone — service inputs cy=280 ──────────────────────────────────────
-  { id: "awsconfig",
-    label: "AWS Config",  sublabel: "compliance rules",
+  // Enricher calls CISA KEV + OSV.dev over HTTPS (cold-start cache + per-CVE)
+  { id: "threatintel",
+    label: "Threat Intel",  sublabel: "CISA KEV + OSV.dev",
     cx: 490, cy: 280, tags: ["cytrix"], category: "service",
-    iconPath: "M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" },
+    iconPath: "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" },
 
+  // Correlator calls CloudTrail boto3 API directly (lookup_events paginator)
   { id: "cloudtrail",
     label: "CloudTrail",  sublabel: "API call history",
     cx: 900, cy: 280, tags: ["cytrix"], category: "service",
@@ -162,8 +164,9 @@ const EDGES: GEdge[] = [
   { id: "tfap-apigw",    from: "tfapply",      to: "apigw",        tags: ["cicd"]   },
   // EventBridge starts the Cytrix flow
   { id: "eb-col",        from: "eventbridge",  to: "collector",    tags: ["cytrix"] },
-  // AWS service inputs into Lambda pipeline
-  { id: "config-col",    from: "awsconfig",    to: "collector",    tags: ["cytrix"] },
+  // Threat intel feeds into Enricher (HTTPS calls to CISA KEV + OSV.dev)
+  { id: "ti-enr",        from: "threatintel",  to: "enricher",     tags: ["cytrix"] },
+  // Correlator queries CloudTrail (boto3 lookup_events paginator)
   { id: "trail-cor",     from: "cloudtrail",   to: "correlator",   tags: ["cytrix"] },
   // Lambda → S3 (vertical down)
   { id: "col-s3r",       from: "collector",    to: "s3raw",        tags: ["cytrix"] },
@@ -199,13 +202,13 @@ const FLOW_DETAILS: Record<FilterId, FlowDetail> = {
     title: "Cytrix Detection Pipeline",
     description: "EventBridge fires every 15 minutes. Findings zigzag through S3 stages driven by ObjectCreated notifications. AWS Config and CloudTrail feed real compliance and activity data.",
     steps: [
-      { label: "EventBridge",  badge: "rate(15 min)",       detail: "Scheduled rule triggers Collector Lambda on a fixed cadence." },
-      { label: "AWS Config",   badge: "compliance rules",   detail: "Prowler uses Config rules to detect misconfigurations against CIS, PCI-DSS, and NIST benchmarks." },
-      { label: "Collector",    badge: "S3 raw/",            detail: "Runs Prowler + Trivy adapters. Writes raw per-tool batches to S3 raw/. S3 ObjectCreated triggers Enricher." },
-      { label: "Enricher",     badge: "S3 enriched/",       detail: "KEV + OSV enrichment in 6 passes. Adds CVE context, blast radius, exposure score, and threat actor tags." },
-      { label: "Scorer",       badge: "S3 scored/",         detail: "Weighted formula across 6 dimensions produces P1-P4 priority tiers. Writes to S3 scored/." },
-      { label: "CloudTrail",   badge: "API call history",   detail: "Correlator queries CloudTrail for related API calls around each P1/P2 finding window." },
-      { label: "Correlator",   badge: "S3 correlated/",     detail: "Groups related findings + CloudTrail events into attack stories. Written to S3 correlated/." },
+      { label: "EventBridge",  badge: "rate(15 min)",       detail: "Scheduled rule triggers Collector Lambda every 15 minutes." },
+      { label: "Collector",    badge: "S3 raw/",            detail: "Reads Prowler OCSF output + Trivy scan results from S3 (written there by GH Actions cron). Normalises into CytrixFindings and writes to S3 raw/." },
+      { label: "Threat Intel", badge: "CISA KEV + OSV.dev", detail: "Enricher fetches CISA Known Exploited Vulnerabilities catalog on cold start, then queries OSV.dev per CVE. No AWS service involved - direct HTTPS." },
+      { label: "Enricher",     badge: "S3 enriched/",       detail: "6 enrichment passes: exposure, threat intel (KEV+OSV), vulnerability, asset criticality, historical, blast radius. S3 ObjectCreated triggers Scorer." },
+      { label: "Scorer",       badge: "S3 scored/",         detail: "Weighted formula across 6 signals (CVSS, EPSS, exposure, blast radius, asset criticality, threat intel) produces P1-P4 tiers." },
+      { label: "CloudTrail",   badge: "boto3 API",          detail: "Correlator calls cloudtrail.get_paginator('lookup_events') to find all API activity on P1/P2 finding resources in the last 7 days." },
+      { label: "Correlator",   badge: "S3 correlated/",     detail: "Groups CloudTrail events with each P1/P2 finding. Builds attack hypothesis. Writes CorrelationStory JSON to S3 correlated/." },
       { label: "Cytrix CLI",   badge: "SecEng laptop",      detail: "Security engineer runs cytrix findings to pull ranked attack stories directly from S3 correlated/." },
     ],
   },
@@ -298,6 +301,15 @@ export default function ApplicationFlow() {
                 </marker>
               )}
             </defs>
+
+            {/* ── GitHub / CI/CD box (wraps GitHub → TF Apply; Dev Laptop is outside) ── */}
+            <rect x="100" y="67" width="325" height="68" rx="8"
+              fill={activeFilter === "cicd" ? "rgba(34,211,238,0.04)" : "rgba(15,23,42,0.3)"}
+              stroke={activeFilter === "cicd" ? "rgba(34,211,238,0.25)" : "rgba(30,41,59,0.7)"}
+              strokeWidth="1" style={{ transition: "all 0.3s" }} />
+            <text x="116" y="80" fontSize="8" fontFamily="monospace"
+              fill={activeFilter === "cicd" ? "#22d3ee" : "#334155"}
+              letterSpacing="1.5" style={{ transition: "all 0.3s" }}>GITHUB</text>
 
             {/* ── AWS outer zone ── */}
             <rect x="445" y="15" width="510" height="445" rx="10"
